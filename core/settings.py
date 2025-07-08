@@ -1,14 +1,19 @@
+from datetime import timedelta
 from pathlib import Path
+import os # Make sure this line is added or exists
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-xroe(bx@=)jz@)6%kgd2e0z=24q9l^iw40m&2k$4c5wwk1&$)4'
+# Import sensitive settings from config.py (MAKE SURE config.py is in .gitignore!)
+try:
+    from .config import *
+except ImportError:
+    # Fallback to environment variable or raise error if config.py not found
+    SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'default-insecure-key-for-development')
+    if SECRET_KEY == 'default-insecure-key-for-development' and not os.environ.get('CI'):
+        # Raise error only if not in CI/CD environment where default might be acceptable
+        raise ValueError("SECRET_KEY must be set in core/config.py or as an environment variable.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -26,6 +31,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
     'users',
     'nlp_services',
 ]
@@ -118,8 +124,8 @@ AUTH_USER_MODEL = 'users.CustomUser' # important
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        # 'rest_framework_simplejwt.authentication.JWTAuthentication', 
-        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication', 
+    #   'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -128,4 +134,11 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10
 }
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=10), 
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),   
+    'ROTATE_REFRESH_TOKENS': True,                
+    'BLACKLIST_AFTER_ROTATION': True,            
+    'UPDATE_LAST_LOGIN': True,
+}
 
