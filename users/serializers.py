@@ -2,6 +2,9 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from uuid import uuid4 # For generating unique username if needed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer # Added for login
+from rest_framework_simplejwt.tokens import RefreshToken # Added for Logout
+
 
 User = get_user_model() # Always use get_user_model() for CustomUser
 
@@ -48,3 +51,53 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         return user
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Customizes the JWT TokenObtainPairSerializer to allow login with email.
+    """
+    def validate(self, attrs):
+        # Use email for authentication instead of username
+        email = attrs.get('email')
+        password = attrs.get('password')
+
+        if not email or not password:
+            raise serializers.ValidationError('Must include "email" and "password".')
+        
+        # Temporarily set username to email for the default validation to work
+        # The default TokenObtainPairSerializer expects a 'username' field.
+        # We map 'email' to 'username' for the superclass's validation.
+        attrs['username'] = email 
+        
+        # Call the superclass's validate method
+        data = super().validate(attrs)
+
+        # Optionally, remove the temporary 'username' from the response data if not needed
+        # This prevents 'username' from appearing in the login response if it's not the primary login field
+        if 'username' in data:
+            del data['username'] 
+
+        # Add custom claims to the token here if not already done in settings.py
+        # Or customize the data returned in the response
+        user = self.user # The authenticated user is available via self.user after super().validate
+        data['email'] = user.email
+        data['full_name'] = user.full_name
+        data['is_staff'] = user.is_staff # Useful for front-end to know if user is admin
+
+        return data
+
+class TokenBlacklistSerializer(serializers.Serializer):
+    """
+    Serializer for blacklisting the refresh token on logout.
+    """
+    refresh = serializers.CharField(required=True)
+
+    def validate(self, attrs):
+        try:
+            # Attempt to get the RefreshToken object
+            token = RefreshToken(attrs["refresh"])
+            token.blacklist() # Blacklist the token
+        except Exception as e:
+            raise serializers.ValidationError({"detail": "Invalid or expired refresh token."})
+        return attrs

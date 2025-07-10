@@ -1,5 +1,3 @@
-# python manage.py makemigrations
-# python manage.py migrate
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 

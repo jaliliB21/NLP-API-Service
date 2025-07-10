@@ -1,12 +1,14 @@
+# users/permissions.py
+
 from rest_framework import permissions
 
-class IsAnonymousOnly(permissions.BasePermission):
+class IsAnonymousOnlyForRegistration(permissions.BasePermission):
     """
-    Custom permission to only allow access to unauthenticated users.
+    Custom permission to only allow access to unauthenticated users for registration.
+    Returns a specific message for authenticated users.
     """
-    message = 'You are already authenticated. You cannot register again.' # Custom error message
+    message = 'You are already authenticated. You cannot register again.'
 
     def has_permission(self, request, view):
-        # Allow access only if the user is NOT authenticated (is_authenticated is False)
+
         return not request.user.is_authenticated
-        
