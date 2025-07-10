@@ -14,6 +14,7 @@ from .serializers import (
     UserRegistrationSerializer,
     CustomTokenObtainPairSerializer, # For login
     TokenBlacklistSerializer,      # For logout
+    ChangePasswordSerializer,
 
 )
 from .permissions import IsAnonymousOnlyForRegistration 
@@ -72,4 +73,42 @@ class UserLogoutView(APIView):
         serializer = TokenBlacklistSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             return Response(status=status.HTTP_205_RESET_CONTENT) # 205 indicates content reset (logout successful)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ChangePasswordView(APIView):
+    """
+    API endpoint for changing user password.
+    Requires authentication and current password verification.
+    """
+    permission_classes = [IsAuthenticated] # Only authenticated users can change password
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            user = request.user # Get the authenticated user from request.user
+            
+            # Verify old password
+            if not user.check_password(serializer.validated_data['old_password']):
+                return Response(
+                    {"old_password": "Old password is not correct."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set the new password
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+
+            # Blacklist all refresh tokens for the user to force re-login
+            # This invalidates all active sessions for the user.
+            try:
+                # RefreshToken.for_user(user) generates a token object (not a new token itself)
+                # and calling .blacklist() on it blacklists all *outstanding* refresh tokens for that user.
+                RefreshToken.for_user(user).blacklist()
+            except Exception as e:
+                # Log any errors during token blacklisting (e.g., if no tokens exist to blacklist)
+                # This should not prevent the password change operation from succeeding.
+                print(f"Error blacklisting refresh tokens for user {user.email}: {e}")
+
+            return Response({"message": "Password changed successfully. Please login again."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -101,3 +101,19 @@ class TokenBlacklistSerializer(serializers.Serializer):
         except Exception as e:
             raise serializers.ValidationError({"detail": "Invalid or expired refresh token."})
         return attrs
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """
+    Serializer for changing user password.
+    Requires old password, new password, and new password confirmation.
+    """
+    old_password = serializers.CharField(write_only=True, required=True)
+    new_password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    new_password2 = serializers.CharField(write_only=True, required=True)
+
+    def validate(self, attrs):
+        # Check if new passwords match
+        if attrs['new_password'] != attrs['new_password2']:
+            raise serializers.ValidationError({"new_password": "New password fields didn't match."})
+        return attrs
