@@ -4,18 +4,18 @@ from .models import CustomUser
 
 class CustomUserAdmin(UserAdmin):
     # These fields will be displayed in the list view of the admin
-    list_display = ('email', 'username', 'full_name', 'is_staff', 'is_active') # Added 'username' here
+    list_display = ('email', 'username', 'full_name', 'is_staff', 'is_active', 'is_pro', 'free_analysis_count') # Added 'is_pro', 'free_analysis_count'
     
     # Fields to search by
-    search_fields = ('email', 'username', 'full_name') # Added 'username' here
+    search_fields = ('email', 'username', 'full_name') 
     
     # Filters in the sidebar
-    list_filter = ('is_staff', 'is_active')
+    list_filter = ('is_staff', 'is_active', 'is_pro') # Added 'is_pro' to filters
     
     # Fieldsets define how fields are grouped and displayed on the add/change form
     fieldsets = (
-        (None, {'fields': ('username', 'email', 'password')}), # Added 'username' here
-        ('Personal info', {'fields': ('full_name',)}),
+        (None, {'fields': ('username', 'email', 'password')}),
+        ('Personal info', {'fields': ('full_name', 'is_pro', 'free_analysis_count')}), # Added 'is_pro', 'free_analysis_count' here
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
@@ -24,17 +24,8 @@ class CustomUserAdmin(UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'email', 'full_name', 'password', 'password2'), # Added 'username' and 'full_name' for add form
+            'fields': ('username', 'email', 'full_name', 'password', 'password2', 'is_pro', 'free_analysis_count'), # Added 'is_pro', 'free_analysis_count' for add form
         }),
     )
     
-    # Order of fields in the add user form
-    # Note: UserAdmin has specific add_fieldsets, make sure to override it if needed.
-    # The default add_fieldsets for UserAdmin might not include full_name,
-    # so explicitly defining add_fieldsets ensures consistency.
-    
-    # If you want to use the default UserAdmin's add_fieldsets and just add to it,
-    # it's more complex, but explicitly defining it like above is common.
-
-
 admin.site.register(CustomUser, CustomUserAdmin)

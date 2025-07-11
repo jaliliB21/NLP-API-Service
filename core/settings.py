@@ -78,10 +78,21 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql', # Change engine to postgresql
+        'NAME': os.environ.get('DB_NAME', 'nlp_db'), # Get from environment variable (from .env)
+        'USER': os.environ.get('DB_USER', 'nlp_user'), # Get from environment variable
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'your_db_password'), # Get from environment variable
+        'HOST': 'db', # This 'db' refers to the service name in docker-compose.yml
+        'PORT': '5432', # Default PostgreSQL port
     }
 }
 

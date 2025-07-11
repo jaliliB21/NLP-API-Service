@@ -43,3 +43,10 @@ db.sqlite3
 /static
 .env # For environment variables (like API keys)
 core/config.py
+
+
+.dockerignore
+.env
+Dockerfile
+docker-compose.yml
+

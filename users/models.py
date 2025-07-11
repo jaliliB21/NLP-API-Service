@@ -8,6 +8,10 @@ class CustomUser(AbstractUser):
     # Adding a single field for full name as requested
     full_name = models.CharField(max_length=255, blank=True, verbose_name='full name')
 
+    # Fields for usage limits and premium plan
+    is_pro = models.BooleanField(default=False, verbose_name="Is Pro User")
+    free_analysis_count = models.IntegerField(default=10, verbose_name="Free Analysis/Summarization Count") # Default 10 free uses
+
     # Let's go with the more common API approach: Login with `email`.
     USERNAME_FIELD = 'email' # Users will log in using their email
     REQUIRED_FIELDS = ['username'] # `username` is still required by AbstractUser but not used for login.
