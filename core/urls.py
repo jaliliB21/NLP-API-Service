@@ -17,5 +17,6 @@ urlpatterns = [
     # include 'users' application URLs
     path('api/users/', include('users.urls')),
     
-    # path('api/', include('nlp_services.urls')), 
+    # include 'nlp_services' application URLs
+    path('api/', include('nlp_services.urls')), 
 ]
