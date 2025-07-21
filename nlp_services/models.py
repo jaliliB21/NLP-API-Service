@@ -35,12 +35,14 @@ class AnalysisHistory(models.Model):
     def __str__(self):
         return f"Analysis for {self.user.username} at {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 
+
 class SummarizationHistory(models.Model):
     """
     Model to store the history of text summarizations.
     """
     SUMMARIZATION_SOURCE_CHOICES = [
-        ('gemini', 'Gemini API'),
+        ('openai', 'OpenAI API'),
+        ('gemini', 'Gemini API'), # new
         ('internal', 'Internal Model'),
     ]
 

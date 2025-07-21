@@ -97,6 +97,24 @@ DATABASES = {
 }
 
 
+# Caching with Redis
+# Make sure your Redis service is running in Docker Compose ('redis' service)
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://redis:6379/1', # 'redis' is the service name in docker-compose.yml
+                                            # '6379' is default Redis port, '1' is the database number
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 100
+            },
+            'DECODER_CLASS': 'django_redis.decode.Latest', # For compatibility with newer redis versions
+        },
+        'KEY_PREFIX': 'nlp_results_cache' # Prefix for cache keys to avoid conflicts
+    }
+}
+
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
@@ -121,7 +139,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us' # You can change this to 'fa-ir' for Persian if you prefer
 
-TIME_ZONE = 'UTC' # Keep as UTC or change to your preferred timezone (e.g., 'Asia/Tehran')
+TIME_ZONE = 'Asia/Tehran' # Keep as UTC or change to your preferred timezone (e.g., 'Asia/Tehran')
 
 USE_I18N = True
 
@@ -146,9 +164,12 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         # No other authentication classes should be here by default for API-only access
+
+        # 'users.authentication.CustomJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
+        
         # This means all APIs require authentication by default,
         # unless specifically overridden in a View (e.g., AllowAny, IsAnonymousOnly).
     ),

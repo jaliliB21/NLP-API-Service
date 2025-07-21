@@ -2,3 +2,6 @@ Django
 djangorestframework
 djangorestframework-simplejwt
 psycopg2-binary
+pytz
+django-redis
+google-generativeai
