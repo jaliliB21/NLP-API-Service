@@ -1,6 +1,5 @@
 from rest_framework import serializers
-# AnalysisHistory model is not needed directly in this serializer
-# as we only define request/response formats for sentiment analysis.
+from nlp_services.models import AnalysisHistory
 
 
 class SentimentAnalysisRequestSerializer(serializers.Serializer):
@@ -31,3 +30,19 @@ class SentimentAnalysisResultSerializer(serializers.Serializer):
     sentiment_type = serializers.CharField() 
     score = serializers.FloatField()
     notes = serializers.CharField(allow_blank=True, required=False) 
+
+
+class AnalysisHistorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for the AnalysisHistory model.
+    Displays the model name (analysis_source) and the full JSON result.
+    """
+    class Meta:
+        model = AnalysisHistory
+        # Define the exact fields you want to show in the API response
+        fields = [
+            'text_input', 
+            'analysis_source',    # This field will show the model name (e.g., 'mock', 'gemini')
+            'analysis_result',    # This field will show the full JSON result from the API
+            'timestamp'
+        ]

@@ -102,16 +102,21 @@ DATABASES = {
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://redis:6379/1', # 'redis' is the service name in docker-compose.yml
-                                            # '6379' is default Redis port, '1' is the database number
+        'LOCATION': 'redis://redis:6379/1',
+
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+
+            # --- THIS IS THE KEY CHANGE ---
+            # Force Django to raise an exception if it cannot connect to Redis
+            'IGNORE_EXCEPTIONS': False,
+
             'CONNECTION_POOL_KWARGS': {
                 'max_connections': 100
             },
-            'DECODER_CLASS': 'django_redis.decode.Latest', # For compatibility with newer redis versions
+            'DECODER_CLASS': 'django_redis.decode.Latest',
         },
-        'KEY_PREFIX': 'nlp_results_cache' # Prefix for cache keys to avoid conflicts
+        'KEY_PREFIX': 'nlp_results_cache'
     }
 }
 

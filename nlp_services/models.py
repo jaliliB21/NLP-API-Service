@@ -8,6 +8,7 @@ class AnalysisHistory(models.Model):
     ANALYSIS_SOURCE_CHOICES = [
         ('gemini', 'Gemini API'),
         ('internal', 'Internal Model'),
+        ('mock', 'Mock Processor'),
         # Add more choices in the future for other APIs if needed
     ]
 
@@ -44,6 +45,7 @@ class SummarizationHistory(models.Model):
         ('openai', 'OpenAI API'),
         ('gemini', 'Gemini API'), # new
         ('internal', 'Internal Model'),
+        ('mock', 'Mock Processor'), # added
     ]
 
     user = models.ForeignKey(

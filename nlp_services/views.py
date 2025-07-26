@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.core.cache import cache
 from django.db import transaction
+from django.core.cache import caches
 
 # Import the processor instance
 from nlp_services.processors.llm_processor import processor_instance
@@ -13,7 +14,9 @@ from nlp_services.processors.llm_processor import processor_instance
 from nlp_services.serializers import (
     SentimentAnalysisRequestSerializer,
     SentimentAnalysisResultSerializer,
+    AnalysisHistorySerializer,
 )
+
 
 from nlp_services.models import AnalysisHistory
 from django.contrib.auth import get_user_model
@@ -89,6 +92,11 @@ class SentimentAnalysisAPIView(BaseNLPView):
                         analysis_type=analysis_type
                     ))
                     cache.set(cache_key, json.dumps(llm_result), timeout=60*60*24)
+                    print(f"Sentiment analysis for '{text[:20]}...' processed by LLM and cached.")
+
+                    # Calls the method from the parent BaseNLPView class
+                    self._save_analysis_history(request.user, text, llm_result, processor.provider_name)
+
                 except Exception as e:
                     # We create a dictionary that matches the serializer's structure
                     results.append({
@@ -99,9 +107,6 @@ class SentimentAnalysisAPIView(BaseNLPView):
                     })
                     continue
 
-            # Calls the method from the parent BaseNLPView class
-            self._save_analysis_history(request.user, text, llm_result, processor.provider_name)
-
             results.append({
                 "text_input": text,
                 "sentiment_type": llm_result.get('sentiment_type') or llm_result.get('sentiment'),
@@ -111,3 +116,18 @@ class SentimentAnalysisAPIView(BaseNLPView):
 
         response_serializer = SentimentAnalysisResultSerializer(instance=results, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class AnalysisHistoryListView(BaseNLPView):
+    """
+    API endpoint to retrieve the sentiment analysis history for the logged-in user.
+    """
+    def get(self, request):
+        # Filter the history to get records only for the currently authenticated user.
+        # The records are ordered by timestamp descending (newest first) by default in the model's Meta class.
+        user_history = AnalysisHistory.objects.filter(user=request.user)
+        
+        # Use the serializer we already created to format the data.
+        serializer = AnalysisHistorySerializer(user_history, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)

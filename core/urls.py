@@ -18,5 +18,5 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     
     # include 'nlp_services' application URLs
-    path('api/', include('nlp_services.urls')), 
+    path('api/nlp/', include('nlp_services.urls')), 
 ]

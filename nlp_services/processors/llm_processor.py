@@ -6,6 +6,7 @@ from django.conf import settings
 import asyncio 
 from .prompts import GEMINI_PROMPTS # Import only the Gemini prompts
 
+
 # --- 1. Base Class (Your original structure, UNCHANGED for future use) ---
 class BaseLLMProcessor(ABC): 
     _instances = {} 
@@ -55,9 +56,7 @@ class GeminiProcessor(BaseLLMProcessor):
             print("GeminiProcessor client initialized successfully.")
 
     async def analyze_sentiment(self, text: str, analysis_type: str = "general_sentiment") -> dict:
-        # --- NEW DEBUGGING LINE ---
-        # This will confirm that the method is being called.
-        print(f"DEBUG: Entering analyze_sentiment for text: '{text[:30]}...'")
+
 
         prompt_template = GEMINI_PROMPTS["sentiment_template"]
         final_prompt = prompt_template.format(text=text)
@@ -65,9 +64,7 @@ class GeminiProcessor(BaseLLMProcessor):
         try:
             response = await self.model.generate_content_async(final_prompt)
             response_text = response.text.strip()
-            
-            # Original debug line, which we expect to NOT see
-            print(f"DEBUG: Raw response from Gemini: {response_text}")
+
 
             if response_text.startswith("```json"):
                 response_text = response_text.strip("```json").strip("```").strip()
@@ -103,10 +100,52 @@ class GeminiProcessor(BaseLLMProcessor):
             raise Exception(f"Gemini API summarization call failed: {e}")
 
 
-# --- Instance Creation (Directly creates the Gemini processor) ---
-gemini_api_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, 'GEMINI_API_KEY', None)
-if not gemini_api_key:
-    raise ValueError("Google Gemini API key (GEMINI_API_KEY) not found.")
+class MockProcessor(BaseLLMProcessor):
+    """
+    A mock processor for development and testing.
+    It simulates API calls without making any real network requests.
+    """
+    _initialized_concrete = False
 
-# The processor_instance is now always a GeminiProcessor
-processor_instance = GeminiProcessor(api_key=gemini_api_key)
+    def __init__(self, api_key: str = "mock_key"):
+        # The init method for the mock processor doesn't need to do much.
+        if not MockProcessor._initialized_concrete:
+            self.provider_name = "mock"
+            MockProcessor._initialized_concrete = True
+            print("MockProcessor client initialized successfully.")
+
+    async def analyze_sentiment(self, text: str, analysis_type: str = "general_sentiment") -> dict:
+        """
+        Simulates a successful sentiment analysis API call.
+        Returns a hardcoded, successful-looking response instantly.
+        """
+        print(f"--- MOCK: Analyzing sentiment for: '{text[:30]}...' ---")
+        # Simulate a small amount of network/processing delay
+        await asyncio.sleep(0.5) 
+        
+        # Return a consistent, fake JSON response that matches our serializer
+        return {
+            "sentiment": "POSITIVE",
+            "score": 0.98,
+            "notes": "This is a mock response from the test processor."
+        }
+
+    async def summarize_text(self, text: str, max_words: int) -> str:
+        """
+        Simulates a successful summarization API call.
+        Returns a hardcoded summary.
+        """
+        print(f"--- MOCK: Summarizing text: '{text[:30]}...' ---")
+        # Simulate a small amount of network/processing delay
+        await asyncio.sleep(0.5)
+        
+        return f"This is a mock summary for the input text with a length of about {max_words} words."
+
+
+# --- Instance Creation (Directly creates the Gemini processor) ---
+# gemini_api_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, 'GEMINI_API_KEY', None)
+# if not gemini_api_key:
+#     raise ValueError("Google Gemini API key (GEMINI_API_KEY) not found.")
+
+# Activate the mock processor
+processor_instance = MockProcessor(api_key="mock_key")
