@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from nlp_services.models import AnalysisHistory
+from nlp_services.models import AnalysisHistory, SummarizationHistory
 
 
 class SentimentAnalysisRequestSerializer(serializers.Serializer):
@@ -37,6 +37,8 @@ class AnalysisHistorySerializer(serializers.ModelSerializer):
     Serializer for the AnalysisHistory model.
     Displays the model name (analysis_source) and the full JSON result.
     """
+    timestamp = serializers.DateTimeField(format="%Y-%m-%d", read_only=True)
+
     class Meta:
         model = AnalysisHistory
         # Define the exact fields you want to show in the API response
@@ -45,4 +47,39 @@ class AnalysisHistorySerializer(serializers.ModelSerializer):
             'analysis_source',    # This field will show the model name (e.g., 'mock', 'gemini')
             'analysis_result',    # This field will show the full JSON result from the API
             'timestamp'
+        ]
+
+
+# --- Serializers for Text Summarization ---
+
+class SummarizationRequestSerializer(serializers.Serializer):
+    """
+    Serializer for accepting a text summarization request.
+    """
+    text = serializers.CharField(max_length=10000) # Text to be summarized
+    max_words = serializers.IntegerField(default=50, min_value=10, max_value=300) # Optional word limit
+
+
+class SummarizationResultSerializer(serializers.Serializer):
+    """
+    Serializer for displaying the summarization result.
+    """
+    original_text = serializers.CharField()
+    summarized_text = serializers.CharField()
+
+
+class SummarizationHistorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for the SummarizationHistory model.
+    """
+    timestamp = serializers.DateTimeField(format="%Y-%m-%d", read_only=True)
+
+    class Meta:
+        model = SummarizationHistory
+        # Define the fields to be included in the history response
+        fields = [
+            'text_input',
+            'summarized_text',
+            'summarization_source',
+            'timestamp',
         ]

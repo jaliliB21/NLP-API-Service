@@ -15,10 +15,13 @@ from nlp_services.serializers import (
     SentimentAnalysisRequestSerializer,
     SentimentAnalysisResultSerializer,
     AnalysisHistorySerializer,
+    SummarizationRequestSerializer,
+    SummarizationResultSerializer,
+    SummarizationHistorySerializer,
 )
 
 
-from nlp_services.models import AnalysisHistory
+from nlp_services.models import AnalysisHistory, SummarizationHistory
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -51,6 +54,17 @@ class BaseNLPView(APIView):
             text_input=text_input,
             analysis_result=result,
             analysis_source=source
+        )
+
+    def _save_summarization_history(self, user, text_input, summarized_text, source):
+        """
+        Saves the text summarization result to history.
+        """
+        history_entry = SummarizationHistory.objects.create(
+            user=user,
+            text_input=text_input,
+            summarized_text=summarized_text,
+            summarization_source=source
         )
 
 
@@ -130,4 +144,76 @@ class AnalysisHistoryListView(BaseNLPView):
         # Use the serializer we already created to format the data.
         serializer = AnalysisHistorySerializer(user_history, many=True)
         
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# -- Summarization -- 
+
+class SummarizationAPIView(BaseNLPView):
+    """
+    API endpoint for text summarization with caching enabled.
+    """
+    def post(self, request):
+        if not processor:
+            return Response({"detail": "AI service not available."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        serializer = SummarizationRequestSerializer(data=request.data)
+        if not serializer.is_valid(raise_exception=True):
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        text = serializer.validated_data['text']
+        max_words = serializer.validated_data['max_words']
+
+        try:
+            self._check_and_deduct_usage(request.user, 1)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+        # --- Caching Logic Added Here ---
+        cache_key = f"summarization_cache:{max_words}:{hash(text)}"
+        cached_summary = cache.get(cache_key)
+
+        if cached_summary:
+            print(f"Retrieved summarization for '{text[:30]}...' from cache.")
+            summarized_text = cached_summary
+            # No need to save to history, as it was saved when first generated.
+        else:
+            try:
+                # Call the processor only if the summary is not in the cache.
+                summarized_text = asyncio.run(processor.summarize_text(
+                    text=text,
+                    max_words=max_words
+                ))
+                
+                # Save the new summary to the cache for 24 hours.
+                cache.set(cache_key, summarized_text, timeout=60*60*24)
+                print(f"Summarization for '{text[:30]}...' processed by LLM and cached.")
+
+                # Save the new result to the summarization history.
+                self._save_summarization_history(
+                    request.user, text, summarized_text, processor.provider_name
+                )
+            except Exception as e:
+                return Response(
+                    {"detail": "Failed to summarize text.", "error": str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        # Prepare and return the response
+        response_data = {
+            "original_text": text,
+            "summarized_text": summarized_text
+        }
+        # We use instance= here because we are serializing our own data, not validating user input.
+        response_serializer = SummarizationResultSerializer(instance=response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class SummarizationHistoryListView(BaseNLPView):
+    """
+    API endpoint to retrieve the summarization history for the logged-in user.
+    """
+    def get(self, request):
+        user_history = SummarizationHistory.objects.filter(user=request.user)
+        serializer = SummarizationHistorySerializer(user_history, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
