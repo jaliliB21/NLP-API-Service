@@ -26,6 +26,9 @@ class AnalysisHistory(models.Model):
         default='gemini', # Default to Gemini for initial phase
         verbose_name="Analysis Source" # English verbose name
     )
+
+    analysis_type = models.CharField(max_length=50, default='general_sentiment')
+
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Timestamp") # English verbose name
 
     class Meta:
@@ -62,6 +65,9 @@ class SummarizationHistory(models.Model):
         default='gemini', # Default to Gemini for initial phase
         verbose_name="Summarization Source" # English verbose name
     )
+
+    max_words_summarization = models.IntegerField(default=50)
+
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Timestamp") # English verbose name
 
     class Meta:

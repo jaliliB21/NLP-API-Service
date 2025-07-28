@@ -28,6 +28,26 @@ User = get_user_model()
 processor = processor_instance
 
 
+def normalize_text_simple(text: str) -> str:
+    """
+    A simple normalization function for Persian text.
+    It removes extra whitespace and trailing periods.
+    """
+    if not isinstance(text, str):
+        return ""
+
+    # 1. Remove leading/trailing whitespace
+    text = text.strip()
+    
+    # 2. Collapse multiple spaces/tabs/newlines in the middle of the text into a single space
+    text = ' '.join(text.split())
+    
+    # 3. Remove all trailing periods from the end of the string
+    text = text.strip('.')
+    
+    return text
+
+
 class BaseNLPView(APIView):
     """
     A base view for NLP tasks that handles shared logic like
@@ -48,15 +68,16 @@ class BaseNLPView(APIView):
                     raise Exception("Free usage limit exceeded. Please upgrade your plan.")
 
     # This is also a synchronous method
-    def _save_analysis_history(self, user, text_input, result, source):
+    def _save_analysis_history(self, user, text_input, result, source, analysis_type):
         AnalysisHistory.objects.create(
             user=user,
             text_input=text_input,
             analysis_result=result,
-            analysis_source=source
+            analysis_source=source,
+            analysis_type=analysis_type
         )
 
-    def _save_summarization_history(self, user, text_input, summarized_text, source):
+    def _save_summarization_history(self, user, text_input, summarized_text, source, max_words):
         """
         Saves the text summarization result to history.
         """
@@ -64,7 +85,8 @@ class BaseNLPView(APIView):
             user=user,
             text_input=text_input,
             summarized_text=summarized_text,
-            summarization_source=source
+            summarization_source=source,
+            max_words_summarization=max_words
         )
 
 
@@ -73,7 +95,7 @@ class SentimentAnalysisAPIView(BaseNLPView):
     """
     API endpoint for sentiment analysis. Inherits from the sync BaseNLPView.
     """
-    # The main view method is a synchronous 'def'
+
     def post(self, request):
         if not processor:
             return Response({"detail": "AI service not available."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -82,54 +104,71 @@ class SentimentAnalysisAPIView(BaseNLPView):
         if not serializer.is_valid(raise_exception=True):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        texts = serializer.validated_data['texts']
+        originalـtexts = serializer.validated_data['texts']
         analysis_type = serializer.validated_data['analysis_type']
 
         try:
-            # Calls the method from the parent BaseNLPView class
-            self._check_and_deduct_usage(request.user, len(texts))
+            
+            self._check_and_deduct_usage(request.user, len(originalـtexts))
+
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
         results = []
-        for text in texts:
-            cache_key = f"sentiment_cache:{analysis_type}:{hash(text)}"
+        for text in originalـtexts:
+            llm_result = None
+
+            normalized_text = normalize_text_simple(text)
+
+            # --- Multi-level Caching Logic Starts Here ---
+
+            # 1. Check Redis cache first (L1 Cache)
+            cache_key = f"sentiment_cache:{analysis_type}:{hash(normalized_text)}"
             cached_result = cache.get(cache_key)
 
             if cached_result:
+                print(f"Retrieved sentiment analysis for '{normalized_text[:30]}...' from L1 Cache (Redis).")
                 llm_result = json.loads(cached_result)
             else:
-                try:
-                    # ✅ Key Point: Call the async processor from the sync view using asyncio.run()
-                    llm_result = asyncio.run(processor.analyze_sentiment(
-                        text=text,
-                        analysis_type=analysis_type
-                    ))
+                # 2. If not in Redis, check the database (L2 Cache)
+                # We search for an existing analysis of the same text by the same user.
+                history_entry = AnalysisHistory.objects.filter(user=request.user, text_input=normalized_text, analysis_type=analysis_type).first()
+                
+                if history_entry:
+                    print(f"Retrieved from L2 Cache (Database) and re-populating Redis.")
+                    llm_result = history_entry.analysis_result
+                    # Re-populate the Redis cache for the next 24 hours
                     cache.set(cache_key, json.dumps(llm_result), timeout=60*60*24)
-                    print(f"Sentiment analysis for '{text[:20]}...' processed by LLM and cached.")
+                else:
+                    # 3. If not in any cache, call the external API
+                    try:
+                        print(f"No cache hit. Calling external API for '{normalized_text[:30]}...'.")
+                        llm_result = asyncio.run(processor.analyze_sentiment(
+                            text=normalized_text,
+                            analysis_type=analysis_type
+                        ))
+                        # Save to both caches for future requests
+                        cache.set(cache_key, json.dumps(llm_result), timeout=60*60*24)
+                        self._save_analysis_history(request.user, normalized_text, llm_result, processor.provider_name, analysis_type)
 
-                    # Calls the method from the parent BaseNLPView class
-                    self._save_analysis_history(request.user, text, llm_result, processor.provider_name)
-
-                except Exception as e:
-                    # We create a dictionary that matches the serializer's structure
-                    results.append({
-                        "text_input": text,
-                        "sentiment_type": "ERROR", # A placeholder value
-                        "score": 0.0,
-                        "notes": f"Failed to process: {str(e)}" # The error message
-                    })
-                    continue
-
+                    except Exception as e:
+                        results.append({
+                            "text_input": normalized_text, "sentiment_type": "ERROR", "score": 0.0,
+                            "notes": f"Failed to process: {str(e)}"
+                        })
+                        continue
+            
+            # This part runs for all successful outcomes (from any cache or API)
             results.append({
-                "text_input": text,
-                "sentiment_type": llm_result.get('sentiment_type') or llm_result.get('sentiment'),
+                "text_input": normalized_text,
+                "sentiment_type": llm_result.get('sentiment'),
                 "score": llm_result.get('score'),
                 "notes": llm_result.get('notes', '')
             })
-
+    
         response_serializer = SentimentAnalysisResultSerializer(instance=results, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
 
 
 class AnalysisHistoryListView(BaseNLPView):
@@ -151,7 +190,7 @@ class AnalysisHistoryListView(BaseNLPView):
 
 class SummarizationAPIView(BaseNLPView):
     """
-    API endpoint for text summarization with caching enabled.
+    API endpoint for text summarization with multi-level caching.
     """
     def post(self, request):
         if not processor:
@@ -164,47 +203,59 @@ class SummarizationAPIView(BaseNLPView):
         text = serializer.validated_data['text']
         max_words = serializer.validated_data['max_words']
 
+        normalized_text = normalize_text_simple(text)
+
         try:
             self._check_and_deduct_usage(request.user, 1)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
-        # --- Caching Logic Added Here ---
-        cache_key = f"summarization_cache:{max_words}:{hash(text)}"
+        summarized_text = None
+        # --- Multi-level Caching Logic Starts Here ---
+
+        # 1. Check Redis cache first (L1 Cache)
+        cache_key = f"summarization_cache:{max_words}:{hash(normalized_text)}"
         cached_summary = cache.get(cache_key)
 
         if cached_summary:
-            print(f"Retrieved summarization for '{text[:30]}...' from cache.")
+            print(f"Retrieved summarization for '{normalized_text[:30]}...' from L1 Cache (Redis).")
             summarized_text = cached_summary
-            # No need to save to history, as it was saved when first generated.
-        else:
-            try:
-                # Call the processor only if the summary is not in the cache.
-                summarized_text = asyncio.run(processor.summarize_text(
-                    text=text,
-                    max_words=max_words
-                ))
-                
-                # Save the new summary to the cache for 24 hours.
-                cache.set(cache_key, summarized_text, timeout=60*60*24)
-                print(f"Summarization for '{text[:30]}...' processed by LLM and cached.")
 
-                # Save the new result to the summarization history.
-                self._save_summarization_history(
-                    request.user, text, summarized_text, processor.provider_name
-                )
-            except Exception as e:
-                return Response(
-                    {"detail": "Failed to summarize text.", "error": str(e)},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+        else:
+            # 2. If not in Redis, check the database (L2 Cache)
+            history_entry = SummarizationHistory.objects.filter(user=request.user, text_input=normalized_text, max_words_summarization=max_words).first()
+
+            if history_entry:
+                print(f"Retrieved from L2 Cache (Database) and re-populating Redis.")
+                summarized_text = history_entry.summarized_text
+                # Re-populate the Redis cache for the next 24 hours
+                cache.set(cache_key, summarized_text, timeout=60*60*24)
+            else:
+                # 3. If not in any cache, call the external API
+                try:
+                    print(f"No cache hit. Calling external API for summarization of '{normalized_text[:30]}...'.")
+                    summarized_text = asyncio.run(processor.summarize_text(
+                        text=normalized_text,
+                        max_words=max_words
+                    ))
+                    
+                    # Save to both caches for future requests
+                    cache.set(cache_key, summarized_text, timeout=60*60*24)
+                    self._save_summarization_history(
+                        request.user, normalized_text, summarized_text, processor.provider_name, max_words
+                    )
+                except Exception as e:
+                    return Response(
+                        {"detail": "Failed to summarize text.", "error": str(e)},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
 
         # Prepare and return the response
         response_data = {
-            "original_text": text,
+            "original_text": normalized_text,
             "summarized_text": summarized_text
         }
-        # We use instance= here because we are serializing our own data, not validating user input.
+
         response_serializer = SummarizationResultSerializer(instance=response_data)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
