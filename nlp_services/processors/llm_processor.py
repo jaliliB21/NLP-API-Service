@@ -56,9 +56,12 @@ class GeminiProcessor(BaseLLMProcessor):
             print("GeminiProcessor client initialized successfully.")
 
     async def analyze_sentiment(self, text: str, analysis_type: str = "general_sentiment") -> dict:
-
-
-        prompt_template = GEMINI_PROMPTS["sentiment_template"]
+        # --- LOGIC TO CHOOSE PROMPT BASED ON analysis_type ---
+        if analysis_type == 'business_intent':
+            prompt_template = GEMINI_PROMPTS["sentiment_template_business"]
+        else: 
+            prompt_template = GEMINI_PROMPTS["sentiment_template_general"]
+        
         final_prompt = prompt_template.format(text=text)
         
         try:
@@ -68,24 +71,13 @@ class GeminiProcessor(BaseLLMProcessor):
 
             if response_text.startswith("```json"):
                 response_text = response_text.strip("```json").strip("```").strip()
-            
-            data = json.loads(response_text)
 
-            sentiment_value = data.get('sentiment') or data.get('label')
-            
-            if not sentiment_value:
-                raise KeyError("Response JSON did not contain a 'sentiment' or 'label' key.")
-
-            result = {
-                "sentiment": sentiment_value.upper(),
-                "score": data.get('score', 0.0),
-                "notes": data.get('notes', f'Analyzed by {self.provider_name}')
-            }
+            result = json.loads(response_text)
             return result
 
         except Exception as e:
-            print(f"Error processing Gemini response: {e}")
-            raise Exception(f"Gemini processing failed: {e}")
+            print(f"Error calling Gemini API for sentiment analysis: {e}")
+            raise Exception(f"Gemini API sentiment analysis call failed: {e}")
 
     async def summarize_text(self, text: str, max_words: int) -> str:
         # This method also reads its prompt from your prompts.py file.
@@ -119,16 +111,23 @@ class MockProcessor(BaseLLMProcessor):
         Simulates a successful sentiment analysis API call.
         Returns a hardcoded, successful-looking response instantly.
         """
-        print(f"--- MOCK: Analyzing sentiment for: '{text[:30]}...' ---")
-        # Simulate a small amount of network/processing delay
+
+        print(f"--- MOCK: Analyzing sentiment for: '{text[:30]}...' with type: {analysis_type} ---")
         await asyncio.sleep(0.5) 
         
-        # Return a consistent, fake JSON response that matches our serializer
-        return {
-            "sentiment": "POSITIVE",
-            "score": 0.98,
-            "notes": "This is a mock response from the test processor."
-        }
+        # --- LOGIC TO RETURN DIFFERENT MOCK DATA ---
+        if analysis_type == 'business_intent':
+            return {
+                "sentiment": "SATISFIED", 
+                "score": 0.95,
+                "notes": "This is a mock response for a business intent analysis."
+            }
+        else:
+            return {
+                "sentiment": "POSITIVE",
+                "score": 0.98,
+                "notes": "This is a mock response for a general sentiment analysis."
+            }
 
     async def summarize_text(self, text: str, max_words: int) -> str:
         """
