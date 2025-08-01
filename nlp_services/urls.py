@@ -5,6 +5,7 @@ from .views import (
     SummarizationAPIView,          
     SummarizationHistoryListView,
     AggregateSentimentAPIView,
+    AggregateAnalysisHistoryListView,
 )
 
 urlpatterns = [
@@ -18,4 +19,5 @@ urlpatterns = [
 
     # AggregateAnalysis
     path('sentiment/aggregate/', AggregateSentimentAPIView.as_view(), name='sentiment_aggregate'),
+    path('history/aggregate/', AggregateAnalysisHistoryListView.as_view(), name='aggregate_history'),
 ]

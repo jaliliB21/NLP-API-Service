@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from nlp_services.models import AnalysisHistory, SummarizationHistory
+from nlp_services.models import AnalysisHistory, SummarizationHistory, AggregateAnalysisHistory
 
 
 class SentimentAnalysisRequestSerializer(serializers.Serializer):
@@ -122,3 +122,22 @@ class AggregateAnalysisResultSerializer(serializers.Serializer):
     key_positives = serializers.ListField(child=serializers.CharField())
     key_negatives = serializers.ListField(child=serializers.CharField())
     summary = serializers.CharField()
+
+
+class AggregateAnalysisHistorySerializer(serializers.ModelSerializer):
+    """
+    Serializer for the AggregateAnalysisHistory model to display the user's history.
+    """
+    timestamp = serializers.DateTimeField(format="%Y-%m-%d", read_only=True)
+
+    class Meta:
+        model = AggregateAnalysisHistory
+        # Define the exact fields you want to return in the API response
+        fields = [
+            'url',
+            'input_texts',
+            'analysis_result',
+            'analysis_source',
+            'analysis_type',
+            'timestamp',
+        ]

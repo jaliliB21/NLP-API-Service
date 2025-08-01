@@ -21,6 +21,7 @@ from nlp_services.serializers import (
     SummarizationHistorySerializer,
     AggregateAnalysisRequestSerializer, 
     AggregateAnalysisResultSerializer,
+    AggregateAnalysisHistorySerializer,
 )
 
 
@@ -360,3 +361,17 @@ class AggregateSentimentAPIView(BaseNLPView):
                 {"detail": "Failed to perform aggregate analysis.", "error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class AggregateAnalysisHistoryListView(BaseNLPView):
+    """
+    API endpoint to retrieve the aggregate analysis history for the logged-in user.
+    """
+    def get(self, request):
+        # Filter history records for the currently authenticated user
+        user_history = AggregateAnalysisHistory.objects.filter(user=request.user)
+        
+        # Serialize the data for the response
+        serializer = AggregateAnalysisHistorySerializer(user_history, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
