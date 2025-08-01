@@ -36,6 +36,10 @@ class BaseLLMProcessor(ABC):
     async def summarize_text(self, text: str, max_words: int) -> str:
         pass
 
+    @abstractmethod
+    async def analyze_aggregate_sentiment(self, texts: list, analysis_type: str) -> dict:
+        pass
+
 
 # --- 2. Concrete Class for Google Gemini ---
 
@@ -140,6 +144,32 @@ class MockProcessor(BaseLLMProcessor):
         
         return f"This is a mock summary for the input text with a length of about {max_words} words."
 
+    # --- ADD THIS NEW METHOD IMPLEMENTATION ---
+    async def analyze_aggregate_sentiment(self, texts: list, analysis_type: str) -> dict:
+        """
+        Simulates a successful aggregate sentiment analysis call.
+        """
+        print(f"--- MOCK: Performing AGGREGATE analysis on {len(texts)} texts with type: {analysis_type} ---")
+        await asyncio.sleep(1) # Simulate a longer processing time
+
+        if analysis_type == "business_intent":
+            # This dictionary now returns English strings
+            return {
+                "overall_sentiment": "MIXED",
+                "satisfaction_score": 65,
+                "key_positives": ["Build Quality", "Shipping Speed"],
+                "key_negatives": ["Poor Battery Life", "High Price"],
+                "summary": "Most users are satisfied with the quality, but battery life is a key weakness."
+            }
+        else: # Default to general
+            # This dictionary is also updated to return English strings
+            return {
+                "overall_sentiment": "POSITIVE",
+                "satisfaction_score": 82,
+                "key_positives": [],
+                "key_negatives": [],
+                "summary": "Overall, 82% of the comments were evaluated as positive."
+            }
 
 # --- Instance Creation (Directly creates the Gemini processor) ---
 # gemini_api_key = os.environ.get("GEMINI_API_KEY") or getattr(settings, 'GEMINI_API_KEY', None)

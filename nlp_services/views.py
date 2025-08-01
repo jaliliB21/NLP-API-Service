@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.cache import cache
 from django.db import transaction
 from django.core.cache import caches
+import hashlib
 
 # Import the processor instance
 from nlp_services.processors.llm_processor import processor_instance
@@ -18,10 +19,12 @@ from nlp_services.serializers import (
     SummarizationRequestSerializer,
     SummarizationResultSerializer,
     SummarizationHistorySerializer,
+    AggregateAnalysisRequestSerializer, 
+    AggregateAnalysisResultSerializer,
 )
 
 
-from nlp_services.models import AnalysisHistory, SummarizationHistory
+from nlp_services.models import AnalysisHistory, SummarizationHistory, AggregateAnalysisHistory
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -87,6 +90,20 @@ class BaseNLPView(APIView):
             summarized_text=summarized_text,
             summarization_source=source,
             max_words_summarization=max_words
+        )
+
+    def _save_aggregate_history(self, user, url, result, source, analysis_type, fingerprint, original_texts):
+        """
+        Saves the aggregate analysis result to its dedicated history model.
+        """
+        AggregateAnalysisHistory.objects.create(
+            user=user,
+            url=url, # Use the 'url' field we defined in the model
+            analysis_result=result,
+            analysis_source=source,
+            analysis_type=analysis_type,
+            input_fingerprint=fingerprint,
+            input_texts=original_texts
         )
 
 
@@ -268,3 +285,78 @@ class SummarizationHistoryListView(BaseNLPView):
         user_history = SummarizationHistory.objects.filter(user=request.user)
         serializer = SummarizationHistorySerializer(user_history, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AggregateSentimentAPIView(BaseNLPView):
+    """
+    API endpoint for aggregate sentiment analysis with smart URL and content caching.
+    """
+    def post(self, request):
+        if not processor:
+            return Response({"detail": "AI service not available."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        serializer = AggregateAnalysisRequestSerializer(data=request.data)
+        if not serializer.is_valid(raise_exception=True):
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = serializer.validated_data
+        analysis_type = validated_data['analysis_type']
+        url = validated_data.get('url')
+        force_reanalyze = validated_data.get('force_reanalyze', False)
+
+        # --- Smart URL Handling Logic ---
+        if url and not force_reanalyze:
+            # Check if this URL has been analyzed before
+            existing_analysis = AggregateAnalysisHistory.objects.filter(user=request.user, url=url).first()
+            if existing_analysis:
+                return Response({
+                    "status": "previously_analyzed",
+                    "message": "This URL has been analyzed before. To re-analyze, send the request again with 'force_reanalyze': true.",
+                    "previous_result": existing_analysis.analysis_result
+                }, status=status.HTTP_200_OK)
+
+        try:
+            # --- Get the list of texts to analyze ---
+            if url:
+                texts_to_analyze = ["I am completely satisfied with the product quality and the shipping speed.",
+                                        "Unfortunately, my package arrived very late and damaged.",
+                                        "I just wanted to ask if this model is also available in another color."
+                                    ]
+            else:
+                texts_to_analyze = validated_data['texts']
+
+            if not texts_to_analyze:
+                return Response({"detail": "No texts found to analyze."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # --- Multi-level Caching Logic ---
+            normalized_texts = sorted([normalize_text_simple(t) for t in texts_to_analyze])
+            content_string = "".join(normalized_texts)
+            fingerprint = hashlib.sha256(content_string.encode('utf-8')).hexdigest()
+
+            cache_key = f"aggregate_cache:{analysis_type}:{fingerprint}"
+            llm_result = cache.get(cache_key)
+
+            if not llm_result:
+                history_entry = AggregateAnalysisHistory.objects.filter(input_fingerprint=fingerprint, analysis_type=analysis_type).first()
+                if history_entry:
+                    llm_result = history_entry.analysis_result
+                    cache.set(cache_key, llm_result, timeout=60*60*24)
+                else:
+                    self._check_and_deduct_usage(request.user, 1)
+
+                    llm_result = asyncio.run(processor.analyze_aggregate_sentiment(texts_to_analyze, analysis_type))
+                    cache.set(cache_key, llm_result, timeout=60*60*24)
+                    
+                    self._save_aggregate_history(
+                        request.user, url, llm_result, processor.provider_name, 
+                        analysis_type, fingerprint, texts_to_analyze
+                    )
+            
+            response_serializer = AggregateAnalysisResultSerializer(instance=llm_result)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"detail": "Failed to perform aggregate analysis.", "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

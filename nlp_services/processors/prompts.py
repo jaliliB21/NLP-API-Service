@@ -26,3 +26,20 @@ GEMINI_PROMPTS = {
         "Text to summarize: \"{text}\""
     ),
 }
+
+# --- Prompts for Aggregate (List) Analysis ---
+GEMINI_PROMPTS_AGGREGATE = {
+    "aggregate_sentiment_general": (
+        "You are an AI that analyzes a list of comments and provides a general statistical sentiment summary. "
+        "Analyze the following list of Persian comments. "
+        "Return ONLY a valid JSON object with the following structure: "
+        "'{{ \"overall_sentiment\": \"POSITIVE\", \"satisfaction_score\": 82, \"key_positives\": [], \"key_negatives\": [], \"summary\": \"Overall, 82% of comments were evaluated as positive.\" }}'.\n\n"
+        "Comments to analyze:\n{texts}"
+    ),
+    "aggregate_sentiment_business": (
+        "You are an AI specialized in extracting business insights from customer feedback. Analyze the following list of Persian comments. "
+        "Return ONLY a valid JSON object with the following structure: "
+        "'{{ \"overall_sentiment\": \"MIXED\", \"satisfaction_score\": 65, \"key_positives\": [\"Build Quality\", \"Shipping Speed\"], \"key_negatives\": [\"Poor Battery Life\", \"High Price\"], \"summary\": \"Customers praise the build quality but complain about poor battery life.\" }}'.\n\n"
+        "Comments to analyze:\n{texts}"
+    ),
+}

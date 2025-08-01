@@ -83,3 +83,42 @@ class SummarizationHistorySerializer(serializers.ModelSerializer):
             'summarization_source',
             'timestamp',
         ]
+
+
+# -- AggregateAnalysis Serializers -- 
+
+class AggregateAnalysisRequestSerializer(serializers.Serializer):
+    """
+    Serializer to accept either a list of texts OR a URL for aggregate analysis.
+    """
+    texts = serializers.ListField(
+        child=serializers.CharField(max_length=5000), 
+        required=False, # Not required if a URL is provided
+        max_length=200  # As requested, limit to 200 texts
+    )
+    url = serializers.URLField(required=False) # Not required if texts are provided
+    analysis_type = serializers.CharField(default='business_intent')
+
+    
+    force_reanalyze = serializers.BooleanField(default=False)
+
+    def validate(self, data):
+        """
+        Check that either 'texts' or 'url' is provided, but not both.
+        """
+        if not data.get('texts') and not data.get('url'):
+            raise serializers.ValidationError("Either 'texts' or a 'url' must be provided.")
+        if data.get('texts') and data.get('url'):
+            raise serializers.ValidationError("Provide either 'texts' or a 'url', not both.")
+        return data
+
+
+class AggregateAnalysisResultSerializer(serializers.Serializer):
+    """
+    Serializer for the result of an aggregate analysis.
+    """
+    overall_sentiment = serializers.CharField()
+    satisfaction_score = serializers.IntegerField()
+    key_positives = serializers.ListField(child=serializers.CharField())
+    key_negatives = serializers.ListField(child=serializers.CharField())
+    summary = serializers.CharField()
