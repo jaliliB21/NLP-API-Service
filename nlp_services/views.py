@@ -58,7 +58,7 @@ class BaseNLPView(APIView):
     authentication and usage deduction.
     This version is synchronous.
     """
-    permission_classes = [IsAuthenticated]
+
 
     # This is a synchronous method
     def _check_and_deduct_usage(self, user, num_items: int = 1):

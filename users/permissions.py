@@ -12,3 +12,16 @@ class IsAnonymousOnlyForRegistration(permissions.BasePermission):
     def has_permission(self, request, view):
 
         return not request.user.is_authenticated
+
+
+class IsEmailVerified(permissions.BasePermission):
+    """
+    Custom permission to only allow access to users with a verified email.
+    """
+    message = 'Please verify your email address to use this feature.'
+
+    def has_permission(self, request, view):
+        """
+        Return `True` if permission is granted, `False` otherwise.
+        """
+        return request.user.is_authenticated and request.user.is_email_verified

@@ -12,6 +12,8 @@ class CustomUser(AbstractUser):
     is_pro = models.BooleanField(default=False, verbose_name="Is Pro User")
     free_analysis_count = models.IntegerField(default=10, verbose_name="Free Analysis/Summarization Count") # Default 10 free uses
 
+    is_email_verified = models.BooleanField(default=False, verbose_name="Email Verified")
+
     # Let's go with the more common API approach: Login with `email`.
     USERNAME_FIELD = 'email' # Users will log in using their email
     REQUIRED_FIELDS = ['username'] # `username` is still required by AbstractUser but not used for login.

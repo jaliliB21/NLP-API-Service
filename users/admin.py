@@ -15,7 +15,7 @@ class CustomUserAdmin(UserAdmin):
     # Fieldsets define how fields are grouped and displayed on the add/change form
     fieldsets = (
         (None, {'fields': ('username', 'email', 'password')}),
-        ('Personal info', {'fields': ('full_name', 'is_pro', 'free_analysis_count')}), # Added 'is_pro', 'free_analysis_count' here
+        ('Personal info', {'fields': ('full_name', 'is_pro', 'free_analysis_count', 'is_email_verified')}), # Added 'is_pro', 'free_analysis_count' here
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
@@ -24,7 +24,7 @@ class CustomUserAdmin(UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'email', 'full_name', 'password', 'password2', 'is_pro', 'free_analysis_count'), # Added 'is_pro', 'free_analysis_count' for add form
+            'fields': ('username', 'email', 'full_name', 'password', 'password2', 'is_pro', 'free_analysis_count', 'is_email_verified'), # Added 'is_pro', 'free_analysis_count' for add form
         }),
     )
     

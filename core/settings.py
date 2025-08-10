@@ -168,12 +168,13 @@ AUTH_USER_MODEL = 'users.CustomUser'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        # No other authentication classes should be here by default for API-only access
+        
 
         # 'users.authentication.CustomJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
+        'users.permissions.IsEmailVerified',
         
         # This means all APIs require authentication by default,
         # unless specifically overridden in a View (e.g., AllowAny, IsAnonymousOnly).
@@ -188,6 +189,11 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',
     ],
 }
+
+# --- Email Configuration for Development ---
+# This backend prints emails to the console instead of sending them.
+# It's perfect for testing email functionality without a real email server.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # djangorestframework-simplejwt Settings
 SIMPLE_JWT = {
@@ -225,3 +231,4 @@ SIMPLE_JWT = {
     # It tells simplejwt to include custom user data like email, full_name, is_staff.
     'USER_CLAIM_SERIALIZER': 'users.serializers.CustomTokenObtainPairSerializer',
 }
+
