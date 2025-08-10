@@ -25,3 +25,14 @@ class IsEmailVerified(permissions.BasePermission):
         Return `True` if permission is granted, `False` otherwise.
         """
         return request.user.is_authenticated and request.user.is_email_verified
+
+
+class IsAnonymousOnly(permissions.BasePermission):
+    """
+    Custom permission to only allow access to anonymous users.
+    """
+    message = 'You are already authenticated and cannot perform this action.'
+
+    def has_permission(self, request, view):
+        # Deny access to authenticated users.
+        return not request.user.is_authenticated

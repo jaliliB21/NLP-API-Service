@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import force_str
 from uuid import uuid4 # For generating unique username if needed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer # Added for login
 from rest_framework_simplejwt.tokens import RefreshToken # Added for Logout
@@ -116,4 +119,57 @@ class ChangePasswordSerializer(serializers.Serializer):
         # Check if new passwords match
         if attrs['new_password'] != attrs['new_password2']:
             raise serializers.ValidationError({"new_password": "New password fields didn't match."})
+        return attrs
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """
+    Serializer for requesting a password reset email.
+    """
+    email = serializers.EmailField(required=True)
+
+    def validate_email(self, value):
+        # Check if a user with this email exists and is active.
+        try:
+            user = User.objects.get(email=value, is_active=True)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("No active user found with this email address.")
+        
+        # You can also check if their email is verified, which is good practice
+        if not user.is_email_verified:
+            raise serializers.ValidationError("Your email address is not verified.")
+            
+        return value
+
+
+class SetNewPasswordSerializer(serializers.Serializer):
+    """
+    Serializer for confirming the password reset and setting a new password.
+    Receives uidb64 and token via context from the view.
+    """
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password2 = serializers.CharField(write_only=True, required=True)
+
+    def validate(self, attrs):
+        # Check if passwords match
+        if attrs['password'] != attrs['password2']:
+            raise serializers.ValidationError({"password": "Password fields didn't match."})
+
+        # Get token and uid from context passed by the view
+        uidb64 = self.context.get('uidb64')
+        token = self.context.get('token')
+
+        try:
+            # Decode the user id
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            raise serializers.ValidationError({'detail': 'Invalid user ID.'})
+
+        # Use Django's default token generator for password reset
+        if not PasswordResetTokenGenerator().check_token(user, token):
+            raise serializers.ValidationError({'detail': 'The reset link is invalid or has expired.'})
+
+        # Attach the user object to the validated data to use in the view
+        attrs['user'] = user
         return attrs

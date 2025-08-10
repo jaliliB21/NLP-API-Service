@@ -17,12 +17,14 @@ from .serializers import (
     CustomTokenObtainPairSerializer, # For login
     TokenBlacklistSerializer,      # For logout
     ChangePasswordSerializer,
+    PasswordResetRequestSerializer,
+    SetNewPasswordSerializer,
 
 )
 
 from .tokens import account_activation_token
-from .permissions import IsAnonymousOnlyForRegistration 
-from .utils import send_verification_email 
+from .permissions import IsAnonymousOnlyForRegistration, IsAnonymousOnly
+from .utils import send_verification_email, send_password_reset_email
 
 User = get_user_model()
 
@@ -186,3 +188,50 @@ class VerifyEmailView(APIView):
                 {'detail': 'The activation link is invalid or has expired.'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class RequestPasswordResetEmailView(APIView):
+    """
+    An endpoint for unauthenticated users to request a password reset email.
+    """
+    permission_classes = [IsAnonymousOnly]
+
+    def post(self, request, *args, **kwargs):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        email = serializer.validated_data['email']
+        user = User.objects.get(email=email)
+        
+        # Send the password reset email using our helper function
+        send_password_reset_email(user)
+
+        return Response(
+            {"detail": "If an account with this email exists, a password reset link has been sent."},
+            status=status.HTTP_200_OK
+        )
+
+class PasswordResetConfirmView(APIView):
+    """
+    An endpoint to handle the password reset confirmation and set a new password.
+    """
+    permission_classes = [IsAnonymousOnly]
+
+    def post(self, request, uidb64, token, *args, **kwargs):
+        # Pass context containing uid and token from the URL to the serializer
+        context = {'uidb64': uidb64, 'token': token}
+        serializer = SetNewPasswordSerializer(data=request.data, context=context)
+        
+        serializer.is_valid(raise_exception=True)
+        
+        user = serializer.validated_data['user']
+        new_password = serializer.validated_data['password']
+
+        # Set the new password
+        user.set_password(new_password)
+        user.save()
+
+        return Response(
+            {"detail": "Your password has been reset successfully. You can now log in with your new password."},
+            status=status.HTTP_200_OK
+        )
