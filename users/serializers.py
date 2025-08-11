@@ -173,3 +173,24 @@ class SetNewPasswordSerializer(serializers.Serializer):
         # Attach the user object to the validated data to use in the view
         attrs['user'] = user
         return attrs
+
+
+# Serializer for User Profile 
+class UserProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializer for viewing and updating user profile information.
+    """
+    date_joined = serializers.DateTimeField(format="%Y-%m-%d", read_only=True)
+
+    class Meta:
+        model = User
+        # Fields to display in the API
+        fields = [
+            'username', 
+            'email', 
+            'full_name', 
+            'is_email_verified', 
+            'date_joined'
+        ]
+        # Fields that can be read but not edited by the user
+        read_only_fields = ['email', 'is_email_verified', 'date_joined']

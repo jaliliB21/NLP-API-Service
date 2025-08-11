@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView # Base class for 
 from rest_framework_simplejwt.tokens import RefreshToken # Added for logout
 from django.http import Http404 # For UserDetailView (will be added back later)
 from rest_framework_simplejwt.authentication import JWTAuthentication 
+from rest_framework.generics import RetrieveUpdateAPIView
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 
@@ -19,6 +20,7 @@ from .serializers import (
     ChangePasswordSerializer,
     PasswordResetRequestSerializer,
     SetNewPasswordSerializer,
+    UserProfileSerializer,
 
 )
 
@@ -274,3 +276,20 @@ class PasswordResetConfirmView(APIView):
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+# View for User Profile
+class UserProfileView(RetrieveUpdateAPIView):
+    """
+    API endpoint for retrieving and updating the logged-in user's profile.
+    Handles GET for retrieving and PUT/PATCH for updating.
+    """
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        """
+        Overrides the default get_object method to return the current user.
+        This ensures the user can only view/edit their own profile.
+        """
+        return self.request.user
