@@ -50,18 +50,43 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class UserRegistrationView(APIView):
     """
     API endpoint for user registration.
-    Allows unauthenticated users to create a new account.
+    Allows unauthenticated users to create a new account and logs them in automatically.
     """
-    permission_classes = [IsAnonymousOnlyForRegistration] # Apply the custom permission here
+    # Your original, correct permission class is back.
+    permission_classes = [IsAnonymousOnlyForRegistration]
 
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         serializer = UserRegistrationSerializer(data=request.data)
+        
+        # We use your original, correct structure for validation.
         if serializer.is_valid(raise_exception=True):
+            # The serializer's create method handles user creation
             user = serializer.save()
-            return Response(
-                {"message": "User registered successfully.", "user_id": user.id},
-                status=status.HTTP_201_CREATED
-            )
+
+            # --- Auto-login and email verification logic starts here ---
+
+            # Send a verification email to the new user
+            send_verification_email(user)
+
+            # Generate JWT tokens for the new user
+            refresh = RefreshToken.for_user(user)
+            
+            # Prepare the response data including tokens for auto-login
+            response_data = {
+                'detail': 'User registered successfully. Please check your email to verify your account.',
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    "full_name": user.full_name,
+                    'is_email_verified': user.is_email_verified,
+                }
+            }
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        
+        # If the serializer is not valid, return the errors.
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -231,7 +256,21 @@ class PasswordResetConfirmView(APIView):
         user.set_password(new_password)
         user.save()
 
-        return Response(
-            {"detail": "Your password has been reset successfully. You can now log in with your new password."},
-            status=status.HTTP_200_OK
-        )
+        # --- code for auto-login starts here ---
+
+        # Generate JWT tokens for the user
+        refresh = RefreshToken.for_user(user)
+        
+        # Prepare the response data including tokens
+        response_data = {
+            'detail': 'Your password has been reset successfully. You are now logged in.',
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    "full_name": user.full_name,
+                }
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
