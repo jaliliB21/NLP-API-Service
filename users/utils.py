@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.conf import settings
 
 from .tokens import account_activation_token
+from .tasks import send_email_task
 
 
 def send_verification_email(user):
@@ -26,13 +27,11 @@ def send_verification_email(user):
     subject = 'Activate Your Account'
     message = f'Hi {user.username},\n\nPlease click the link below to verify your email address:\n{verification_url}'
     
-    # Send the email
-    send_mail(
-        subject,
-        message,
-        settings.DEFAULT_FROM_EMAIL, # Use default from email from settings
-        [user.email],
-        fail_silently=False,
+    # Key Change: Use .delay() to send the task to the Celery queue
+    send_email_task.delay(
+        subject=subject, 
+        message=message, 
+        recipient_list=[user.email]
     )
 
 
@@ -63,11 +62,9 @@ def send_password_reset_email(user):
         f'If you did not request this, please ignore this email.'
     )
     
-    # Send the email using Django's send_mail function
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL, # Use a default sender from settings
-        recipient_list=[user.email],
-        fail_silently=False,
+    # Key Change: Use .delay() to send the task to the Celery queue
+    send_email_task.delay(
+        subject=subject, 
+        message=message, 
+        recipient_list=[user.email]
     )
