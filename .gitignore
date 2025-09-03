@@ -49,4 +49,5 @@ core/config.py
 .env
 Dockerfile
 docker-compose.yml
+staticfiles/
 

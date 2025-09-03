@@ -6,5 +6,9 @@ pytz
 django-redis
 google-generativeai
 celery[redis]
+channels
+channels_redis
+daphne
+
 
 

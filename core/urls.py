@@ -6,6 +6,11 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
+# these two imports 
+from django.conf import settings
+from django.conf.urls.static import static
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
  
@@ -20,3 +25,7 @@ urlpatterns = [
     # include 'nlp_services' application URLs
     path('api/nlp/', include('nlp_services.urls')), 
 ]
+
+# This is for serving static files during development ONLY.
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

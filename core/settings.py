@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'nlp_services', 
 ]
 
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -72,7 +73,23 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'core.wsgi.application'
+
+# --- these two new sections for Channels  ---
+
+# 1. Point to the ASGI application
+# This tells Django to use our asgi.py file as the entry point.
+ASGI_APPLICATION = 'core.asgi.application'
+
+# 2. Channel Layers Configuration
+# This tells Channels to use Redis as the message broker.
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('redis', 6379)], # Points to the 'redis' service in docker-compose
+        },
+    },
+}
 
 
 # Database
@@ -168,14 +185,11 @@ USE_I18N = True
 
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
-
 STATIC_URL = 'static/'
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
+
+# The absolute path to the directory where collectstatic will collect static files for deployment.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
