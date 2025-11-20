@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings # To access the CustomUser model
 
+
 class AnalysisHistory(models.Model):
     """
     Model to store the history of sentiment analyses.

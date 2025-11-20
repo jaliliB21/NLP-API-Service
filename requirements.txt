@@ -4,6 +4,7 @@ djangorestframework-simplejwt
 psycopg2-binary
 pytz
 django-redis
+drf-spectacular
 google-generativeai
 celery[redis]
 channels

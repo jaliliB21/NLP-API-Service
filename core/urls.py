@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 # these two imports 
 from django.conf import settings
@@ -24,6 +25,14 @@ urlpatterns = [
     
     # include 'nlp_services' application URLs
     path('api/nlp/', include('nlp_services.urls')), 
+
+
+    # Schema (swagger.json)
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    # 1. Swagger UI:
+    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    # 2. ReDoc UI:
+    path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
 # This is for serving static files during development ONLY.

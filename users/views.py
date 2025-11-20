@@ -24,11 +24,53 @@ from .serializers import (
 
 )
 
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiExample
+
 from .tokens import account_activation_token
 from .permissions import IsAnonymousOnlyForRegistration, IsAnonymousOnly
 from .utils import send_verification_email, send_password_reset_email
 
 User = get_user_model()
+
+
+USER_PROFILE_EXAMPLES = [
+    # 1. Example for GET (Response Output)
+    OpenApiExample(
+        'Profile GET Response',
+        description='Sample successful profile retrieval (READ-ONLY fields included).',
+        value={
+            'username': 'behzad_1',  
+            'email': 'user@example.com', 
+            'full_name': 'Behzad Jalili', 
+            'is_email_verified': True,
+            'date_joined': '2023-11-01'
+        },
+        response_only=True,
+    ),
+
+    # 2. Example for PUT (Complete Input Request)
+    OpenApiExample(
+        'Profile PUT Request',
+        description='Sample PUT request to update ALL editable fields.',
+        value={
+            'username': 'behzad_1', 
+            'full_name': 'Behzad Jalili', 
+        },
+        request_only=True,
+    ),
+    
+    # 3. Example for PATCH (Partial Input Request)
+    OpenApiExample(
+        'Profile PATCH Request',
+        description='Sample PATCH request to update only one field.',
+        value={
+            'full_name': 'Behzad Jalili',
+        },
+        request_only=True,
+
+    ),
+]
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -57,6 +99,28 @@ class UserRegistrationView(APIView):
     # Your original, correct permission class is back.
     permission_classes = [IsAnonymousOnlyForRegistration]
 
+    @extend_schema(
+        request = UserRegistrationSerializer, 
+        examples = [
+            OpenApiExample(
+                'Registration Input Example',
+                value={
+                    'email': 'user@example.com',
+                    'username': 'behzad_1', 
+                    'full_name': 'Behzad Jalili', 
+                    'password': 'StrongPassword123', 
+                    'password2': 'StrongPassword123'
+                },
+                request_only=True 
+            ),
+        ],
+
+        responses={
+            status.HTTP_201_CREATED: {'description': 'User registered and auto-logged in. Email verification required.'},
+            status.HTTP_400_BAD_REQUEST: None,
+        }
+    )
+
     def post(self, request, *args, **kwargs):
         serializer = UserRegistrationSerializer(data=request.data)
         
@@ -81,7 +145,7 @@ class UserRegistrationView(APIView):
                 'user': {
                     'id': user.id,
                     'email': user.email,
-                    "full_name": user.full_name,
+                    'full_name': user.full_name,
                     'is_email_verified': user.is_email_verified,
                 }
             }
@@ -117,6 +181,17 @@ class ChangePasswordView(APIView):
     """
     permission_classes = [IsAuthenticated] # Only authenticated users can change password
 
+
+    @extend_schema(
+        # 1. REQUEST: Tells Swagger which fields to display in the input body.
+        request=ChangePasswordSerializer, 
+        
+        # 3. RESPONSES: Documents the possible outcomes.
+        responses={
+            status.HTTP_200_OK: {'description': 'Password changed successfully.'},
+            status.HTTP_400_BAD_REQUEST: {'description': 'Invalid input (e.g., password mismatch or wrong old password).'},
+        }
+    )
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
@@ -223,6 +298,12 @@ class RequestPasswordResetEmailView(APIView):
     """
     permission_classes = [IsAnonymousOnly]
 
+    @extend_schema(
+        request=PasswordResetRequestSerializer,
+        responses={
+            status.HTTP_200_OK: {'description': 'A password reset link has been sent to the email.'},
+        }
+    )
     def post(self, request, *args, **kwargs):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -244,6 +325,13 @@ class PasswordResetConfirmView(APIView):
     """
     permission_classes = [IsAnonymousOnly]
 
+    @extend_schema(
+        request=SetNewPasswordSerializer,
+        responses={
+            status.HTTP_200_OK: {'description': 'Password successfully set and updated.'},
+            status.HTTP_400_BAD_REQUEST: None,
+        }
+    )
     def post(self, request, uidb64, token, *args, **kwargs):
         # Pass context containing uid and token from the URL to the serializer
         context = {'uidb64': uidb64, 'token': token}
@@ -278,7 +366,10 @@ class PasswordResetConfirmView(APIView):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
-# View for User Profile
+@extend_schema(
+
+    examples=USER_PROFILE_EXAMPLES
+)
 class UserProfileView(RetrieveUpdateAPIView):
     """
     API endpoint for retrieving and updating the logged-in user's profile.

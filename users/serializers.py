@@ -8,7 +8,6 @@ from uuid import uuid4 # For generating unique username if needed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer # Added for login
 from rest_framework_simplejwt.tokens import RefreshToken # Added for Logout
 
-
 User = get_user_model() # Always use get_user_model() for CustomUser
 
 
@@ -192,5 +191,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'is_email_verified', 
             'date_joined'
         ]
+
         # Fields that can be read but not edited by the user
         read_only_fields = ['email', 'is_email_verified', 'date_joined']

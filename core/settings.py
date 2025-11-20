@@ -1,6 +1,6 @@
 from datetime import timedelta # Make sure this is imported
 import os 
-
+import textwrap
 from pathlib import Path
 
 
@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt', # Ensure this is present
     'rest_framework_simplejwt.token_blacklist', # IMPORTANT: Add this for token blacklisting to work
+    'drf_spectacular',
     # My apps
     'users', 
     'nlp_services', 
@@ -220,6 +221,8 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.FormParser',
         'rest_framework.parsers.MultiPartParser',
     ],
+
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 
@@ -260,3 +263,18 @@ SIMPLE_JWT = {
     'USER_CLAIM_SERIALIZER': 'users.serializers.CustomTokenObtainPairSerializer',
 }
 
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Scalable NLP API Service',
+    'DESCRIPTION': textwrap.dedent('''
+        A highly scalable Python/Django backend service delivering comprehensive **Natural Language Processing (NLP)** capabilities.
+            
+        ### Key Features:
+        * **Multi-Mode Analysis:** Supports advanced sentiment classification (General and Business-focused) and single-text summarization.
+        * **Three-Layered Caching:** Implements a robust caching system (Redis → Database → External Service) to ensure high performance and efficiency for every query.
+        * **Flexible Architecture:** Built with the **Strategy Pattern** for seamless integration and easy switching between external NLP providers (e.g., Gemini, ChatGPT). **Celery** handles background asynchronous tasks.
+        * **Secure & Real-Time:** Features secure **JWT Authentication** and utilizes **WebSockets** for sending immediate, real-time notifications to the frontend.
+    '''),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # OTHER SETTINGS
+}
