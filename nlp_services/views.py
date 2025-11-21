@@ -8,6 +8,8 @@ from django.core.cache import cache
 from django.db import transaction
 from django.core.cache import caches
 import hashlib
+from rest_framework import generics
+from drf_spectacular.utils import extend_schema
 
 # Import the processor instance
 from nlp_services.processors.llm_processor import processor_instance
@@ -23,8 +25,7 @@ from nlp_services.serializers import (
     AggregateAnalysisResultSerializer,
     AggregateAnalysisHistorySerializer,
 )
-
-
+from nlp_services.pagination import StandardLimitOffsetPagination
 from nlp_services.models import AnalysisHistory, SummarizationHistory, AggregateAnalysisHistory
 from django.contrib.auth import get_user_model
 
@@ -52,7 +53,7 @@ def normalize_text_simple(text: str) -> str:
     return text
 
 
-class BaseNLPView(APIView):
+class BaseNLPView:
     """
     A base view for NLP tasks that handles shared logic like
     authentication and usage deduction.
@@ -109,11 +110,24 @@ class BaseNLPView(APIView):
 
 
 # This view now inherits from the synchronous BaseNLPView
-class SentimentAnalysisAPIView(BaseNLPView):
+class SentimentAnalysisAPIView(BaseNLPView, APIView):
     """
     API endpoint for sentiment analysis. Inherits from the sync BaseNLPView.
     """
-
+    @extend_schema(
+        summary='Submit Text for Single Sentiment Analysis',
+        description="Processes the input text(s) using the AI model, \
+        deducts user usage quota, and saves the detailed result to the analysis history.",
+        
+        # REQUEST: Displays input parameters (input_text, max_words)
+        request=SentimentAnalysisRequestSerializer,
+        
+        # RESPONSES
+        responses={
+            status.HTTP_200_OK: SentimentAnalysisResultSerializer, # Success response body
+            status.HTTP_400_BAD_REQUEST: None,                     # Auto-generated error structure
+        }
+    )
     def post(self, request):
         if not processor:
             return Response({"detail": "AI service not available."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -189,27 +203,41 @@ class SentimentAnalysisAPIView(BaseNLPView):
 
 
 
-class AnalysisHistoryListView(BaseNLPView):
+class AnalysisHistoryListView(BaseNLPView, generics.ListAPIView):
     """
     API endpoint to retrieve the sentiment analysis history for the logged-in user.
+    
+    This view inherits from ListAPIView, automatically handling the GET method 
+    and ensuring proper Swagger documentation for the response structure (including pagination).
     """
-    def get(self, request):
-        # Filter the history to get records only for the currently authenticated user.
-        # The records are ordered by timestamp descending (newest first) by default in the model's Meta class.
-        user_history = AnalysisHistory.objects.filter(user=request.user)
-        
-        # Use the serializer we already created to format the data.
-        serializer = AnalysisHistorySerializer(user_history, many=True)
-        
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    # 1. Define the Serializer Class: This is crucial for drf-spectacular 
+    serializer_class = AnalysisHistorySerializer 
+    
+    # 2. Define the QuerySet Filter: Overriding get_queryset ensures only the 
+    def get_queryset(self):
+        return AnalysisHistory.objects.filter(user=self.request.user).order_by('-timestamp')
 
 
 # -- Summarization -- 
 
-class SummarizationAPIView(BaseNLPView):
+class SummarizationAPIView(BaseNLPView, APIView):
     """
     API endpoint for text summarization with multi-level caching.
     """
+    @extend_schema(
+        summary='Submit Text for Summarization',
+        description="Processes the input text using the AI model, deducts usage, and saves the result to history.",
+        
+        # REQUEST: Displays input parameters (input_text, max_words)
+        request=SummarizationRequestSerializer,
+        
+        # RESPONSES: Displays the output structure for success and errors
+        responses={
+            status.HTTP_200_OK: SummarizationResultSerializer, # Success response body
+            status.HTTP_400_BAD_REQUEST: None,                     # Auto-generated error structure
+        }
+    )
     def post(self, request):
         if not processor:
             return Response({"detail": "AI service not available."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -278,20 +306,40 @@ class SummarizationAPIView(BaseNLPView):
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
-class SummarizationHistoryListView(BaseNLPView):
+class SummarizationHistoryListView(BaseNLPView, generics.ListAPIView):
     """
     API endpoint to retrieve the summarization history for the logged-in user.
     """
-    def get(self, request):
-        user_history = SummarizationHistory.objects.filter(user=request.user)
-        serializer = SummarizationHistorySerializer(user_history, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    # to infer and document the correct GET response structure in Swagger.
+    serializer_class = SummarizationHistorySerializer 
+    
+    # 2. Apply the custom pagination class for infinite scrolling (Limit/Offset).
+    pagination_class = StandardLimitOffsetPagination 
+    
+    # 3. Override get_queryset to filter the history by the currently logged-in user.
+    def get_queryset(self):
+        # The records are ordered by descending creation date (newest first).
+        return SummarizationHistory.objects.filter(user=self.request.user).order_by('-timestamp')
 
 
-class AggregateSentimentAPIView(BaseNLPView):
+class AggregateSentimentAPIView(BaseNLPView, APIView):
     """
     API endpoint for aggregate sentiment analysis with smart URL and content caching.
     """
+    @extend_schema(
+        summary='Submit Multiple Texts for Aggregate Analysis',
+        description="Accepts a list of multiple input texts (e.g., customer reviews) and processes them to generate a single, \
+                    combined analytical result that summarizes the overall sentiment or dominant themes of the entire collection.",
+        
+        # REQUEST
+        request=AggregateAnalysisRequestSerializer,
+        
+        # RESPONSES: Displays the output structure for success and errors
+        responses={
+            status.HTTP_200_OK: AggregateAnalysisResultSerializer, # Success response body
+            status.HTTP_400_BAD_REQUEST: None,                     # Auto-generated error structure
+        }
+    )
     def post(self, request):
         if not processor:
             return Response({"detail": "AI service not available."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -363,15 +411,15 @@ class AggregateSentimentAPIView(BaseNLPView):
             )
 
 
-class AggregateAnalysisHistoryListView(BaseNLPView):
+class AggregateAnalysisHistoryListView(BaseNLPView, generics.ListAPIView):
     """
     API endpoint to retrieve the aggregate analysis history for the logged-in user.
+    Uses generics.ListAPIView for automatic GET handling and Swagger documentation.
     """
-    def get(self, request):
-        # Filter history records for the currently authenticated user
-        user_history = AggregateAnalysisHistory.objects.filter(user=request.user)
-        
-        # Serialize the data for the response
-        serializer = AggregateAnalysisHistorySerializer(user_history, many=True)
-        
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    # 1. Explicitly define the serializer class. This is CRITICAL for drf-spectacular 
+    serializer_class = AggregateAnalysisHistorySerializer 
+    
+    # 2. Override get_queryset to filter the history by the currently logged-in user.
+    def get_queryset(self):
+        return AggregateAnalysisHistory.objects.filter(user=self.request.user).order_by('-timestamp')
